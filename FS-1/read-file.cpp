@@ -5,7 +5,7 @@
 int main (int argc, char *argv[]) {
 	char buffer[50];
 	if(argc != 2) {
-		return 1;
+		return EXIT_FAILURE;
 	}
 	int fd = open(argv[1], O_RDONLY);
 	if(fd == -1) {
