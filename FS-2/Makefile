@@ -3,5 +3,5 @@ all: simple-copy
 simple-copy: simple-copy.cpp
 	g++ simple-copy.cpp -o simple-copy
 
-clear:
+clean:
 	rm simple-copy
