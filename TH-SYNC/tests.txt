@@ -1,0 +1,55 @@
+mutex:
+
+Final value is 500000
+processor time needed: 196172
+
+spinlock:
+
+Final value is 500000
+processor time needed:3687486
+
+semaphores:
+
+Final value is 500000
+processor time needed: 1119588
+
+more on each:
+
+mutex:
+
+Final value is 500000
+processor time needed: 637769
+Final value is 500000
+processor time needed: 236509
+Final value is 500000
+processor time needed: 208715
+Final value is 500000
+processor time needed: 429539
+Final value is 500000
+processor time needed: 442895
+
+spinlock:
+
+Final value is 500000
+processor time needed:3618009
+Final value is 500000
+processor time needed:4743123
+Final value is 500000
+processor time needed:4533506
+Final value is 500000
+processor time needed:3054283
+Final value is 500000
+processor time needed:6181733
+
+semaphores:
+
+Final value is 500000
+processor time needed: 1739125
+Final value is 500000
+processor time needed: 1754059
+Final value is 500000
+processor time needed: 1148823
+Final value is 500000
+processor time needed: 1682282
+Final value is 500000
+processor time needed: 1609062
