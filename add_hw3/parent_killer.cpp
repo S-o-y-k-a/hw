@@ -35,11 +35,11 @@ int main() {
 
 	sleep(3);
 
-	std::cout << "I'm a parent, and after sometime of existing normally, i'm... well.. still existing";
+	std::cout << "I'm a parent, and after some time of existing normally, i'm... well.. still existing";
 
         wait(nullptr);
 
-        std::cout << "Yo, parent here, still alive after attepmted murder.\n";
+        std::cout << "Yo, parent here, still alive after attepmted murder(child exited btw).\n";
     }
 
     return 0;
