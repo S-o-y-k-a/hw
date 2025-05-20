@@ -1,6 +1,6 @@
 #include <iostream>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -12,227 +12,387 @@
 #include <vector>
 #include <sstream>
 #include <ctime>
-#include <unordered_map>
+#include <sstream>
 
-
-//structs
-/*
-struct User {
- 
-	std::string login;
-	std::string password;
-
-	int c_socket;
- 
-	struct Gamescore {
-		int sea_fight;
-	};
-};
-
-struct SeaFight {
-
-	SeaFight(std::string u1, std::string u2) {}
-	
-	std::string user1;
-	std::string user2;
-
-	std::vector<std::vector<int>> map1(10, std::vector<int>(10, 0));
-	std::vector<std::vector<int>> map2(10, std::vector<int>(10, 0));
-}; 
 
 //global things
  
-std::unordered_map<std::string, User> users_online;
- 
-std::unordered_map<std::string, User> users; */
- 
 pthread_mutex_t mute = PTHREAD_MUTEX_INITIALIZER;
 
-#define board_size 4
 #define players_count 2
-#define ship_count 3
-#define max_score 4
 
 int server_socket;
- 
 
-//game handle funclion
+//helping functions
 
-void draw_boards(int client_socket, std::vector<std::vector<int>>& r_board, std::vector<std::vector<int>>& s_board) {
+bool recv_msg(int*& clients, int client, char*& buf, int& br) {
+	br = recv(client, buf, 100000, 0);
+    if(br <= 0) {
+		std::cout << client<< std::endl;
+		pthread_mutex_lock(&mute);
+	    std::cout <<  "Failed to hear from client :(. Shutting down the game session.";
+		pthread_mutex_unlock(&mute);
+	    for(int i = 0; i < players_count; ++i) {
+			close(clients[i]);
+		}
+		delete[] clients;
+		return false;
+    }
+	buf[br] = '\0';
+	
+	return true;
+}
+
+bool send_msg(int*& clients, int client, std::string msg) {
+	if(send(client, msg.c_str(), msg.size(), 0) < 0) {
+		pthread_mutex_lock(&mute);
+    	std:: cout << "Can't reach user :(. Shutting down the game session.";
+		pthread_mutex_unlock(&mute);
+		for(int i = 0; i < players_count; ++i) {
+			close(clients[i]);
+		}
+		delete[] clients;
+		return false;
+	}
+	return true;
+}
+
+void draw_boards(int client_socket, std::vector<std::vector<int>>& r_board, std::vector<std::vector<int>>& s_board, int board_size) {
 
 	std::string r_message;
 
-	for(int i = board_size - 1; i >= 0; --i) {
-		for(int j = 0; j < board_size; ++j) {
-			if(r_board[i][j] == 0) {
-				r_message += "\033[1;30;47mo";
-			}
-			else if(r_board[i][j] == 1) {
-				r_message += "\033[1;32;47mo";
-			} 
-			else if(r_board[i][j] == 2) {
-				r_message += "\033[1;31;47mo";
-			}
-			else if(r_board[i][j] == 3) {
-				r_message += "\033[1;34;47mo";
-			}
-			
-			r_message += "\033[0m";
+	for (int i = 0; i < board_size; ++i) {
+		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
+	}
+	r_message += "\n";
+
+	for (int i = 0; i < board_size; ++i) {
+		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
+		for (int j = 0; j < board_size; ++j) {
+			if (r_board[i][j] == 0)
+				r_message += "\033[1;30;47m o \033[0m";
+			else if (r_board[i][j] == 1)
+				r_message += "\033[1;32;47m o \033[0m";
+			else if (r_board[i][j] == 2)
+				r_message += "\033[1;31;47m o \033[0m";
+			else if (r_board[i][j] == 3)
+				r_message += "\033[1;34;47m o \033[0m";
 		}
 		r_message += "\n";
 	}
 	r_message += "\n";
 
-	for(int i = board_size - 1; i >= 0; --i) {
-		for(int j = 0; j < board_size; ++j) {
-			if(s_board[i][j] == 0 || s_board[i][j] == 1) {
-				r_message += "\033[1;30;47mo";
-			}
-			else if(s_board[i][j] == 2) {
-				r_message += "\033[1;31;47mo";
-			} 
-			else if(s_board[i][j] == 3) {
-				r_message += "\033[1;34;47mo";
-			}
-			
-			r_message += "\033[0m";
+	for (int i = 0; i < board_size; ++i) {
+		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
+	}
+	r_message += "\n";
+
+	for (int i = 0; i < board_size; ++i) {
+		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
+		for (int j = 0; j < board_size; ++j) {
+			if (s_board[i][j] == 0)
+				r_message += "\033[1;30;47m o \033[0m";
+			else if (s_board[i][j] == 2)
+				r_message += "\033[1;31;47m o \033[0m";
+			else if (s_board[i][j] == 3)
+				r_message += "\033[1;34;47m o \033[0m";
+			else
+				r_message += "\033[1;30;47m o \033[0m";
 		}
 		r_message += "\n";
 	}
+	r_message += "\n";
 
-	if(send(client_socket, r_message.c_str(), r_message.size(), 0) < 0) {
+	if (send(client_socket, r_message.c_str(), r_message.size(), 0) < 0) {
 		pthread_mutex_lock(&mute);
-    	std:: cout << "Can't reach user :(";
+		std::cout << "Can't reach user :(";
 		pthread_mutex_unlock(&mute);
 		close(server_socket);
 		exit(errno);
 	}
-
+ 
 }
+
+//game function
 
 void* sea_fight (void* arg) {
 
+	int ship_count = 0;
+    int max_score = 0;
+	int board_size;
 	int* client_sockets = static_cast<int*>(arg);
+	char* buffer = new char[100001];
+    int bytes_recieved;
 
-	for(int i = 0; i < players_count; ++i) {
-		std::cout << client_sockets[i] << std::endl;
+	//preparing for the game
+
+	std::srand(std::time(nullptr));
+	int cur_player = std::rand() % players_count;
+
+	//board size
+
+	BOARD_SIZE:
+
+	std::string msg = "What should be the board size? Send the number:\n";
+
+	if(!send_msg(client_sockets, client_sockets[cur_player], msg)) {
+		delete[] buffer;
+		return 0;
+	}
+
+	if(!recv_msg(client_sockets, client_sockets[cur_player], buffer, bytes_recieved)) {
+		delete[] buffer;
+		return 0;
+	}
+
+	board_size = std::stoi(buffer);
+	cur_player = (cur_player + 1) % players_count;
+	msg = "Your opponent wants to set the board size to ";
+	msg += std::to_string(std::stoi(buffer));
+	msg += ". Do you agree? y/n";
+	
+	if(!send_msg(client_sockets, client_sockets[cur_player], msg)) {
+		delete[] buffer;
+		return 0;
+	}
+	if(!recv_msg(client_sockets, client_sockets[cur_player], buffer, bytes_recieved)) {
+		delete[] buffer;
+		return 0;
+	}
+	if(buffer[0] == 'y'){	
+	}
+	else {
+		goto BOARD_SIZE;
+	}
+
+	//ships size
+
+	std::vector<int> ships;
+	std::vector<int> save_ships;
+	int value;
+
+	SHIP_SIZE:
+
+	msg = "Now lets determine ship sizes and count. Choose to your liking!\nThat's how: abc would mean you have a one-sized ships,\nb two-sized ships and so on.\n";
+
+	if(!send_msg(client_sockets, client_sockets[cur_player], msg)) {
+		delete[] buffer;
+		return 0;
+	}
+
+	if(!recv_msg(client_sockets, client_sockets[cur_player], buffer, bytes_recieved)) {
+		delete[] buffer;
+		return 0;
+	}
+
+	cur_player = (cur_player + 1) % players_count;
+
+	ships.resize(bytes_recieved);
+
+	for(int i = 0; i < bytes_recieved; ++i) {
+		ships[i] = buffer[i] - '0';
+		ship_count += ships[i];
+		max_score += ships[i] * (i + 1);
 	}
 	
-	std::vector<std::vector<std::vector<int>>> real_board(players_count, std::vector<std::vector<int>>(board_size, std::vector<int>(board_size, 0)));
+	save_ships = ships;
+
+	msg = "Your opponent wants to set the ship count to ";
+	msg += std::to_string(ship_count);
+	msg += " and sizes of ships: ";
+	for(int i = 0; i < bytes_recieved; ++i) {
+		msg += buffer[i];
+	}
+	msg += ". Do you agree? y/n\n";
+
+	if(!send_msg(client_sockets, client_sockets[cur_player], msg)) {
+		delete[] buffer;
+		return 0;
+	}
+
+	if(!recv_msg(client_sockets, client_sockets[cur_player], buffer, bytes_recieved)) {
+		delete[] buffer;
+		return 0;
+	}
+
+	if(buffer[0] == 'y'){
+		
+	}
+	else {
+		goto SHIP_SIZE;
+	}
 
 	//player boards filling
 
-	char buffer[1001];
-    int bytes_recieved;
+	std::vector<std::vector<std::vector<int>>> real_board(players_count, std::vector<std::vector<int>>(board_size, std::vector<int>(board_size, 0)));
 
-	int x1;
-	int y1;
-	int x2;
-	int y2;
+
+	std::vector<int> coords;
+	int count = 0;
 
 	int begin;
 	int end;
 
 	for(int i = 0; i < players_count; ++i) {
 
+	if(!send_msg(client_sockets, client_sockets[i], "Now let's fill the board, ship after ship!\n")) {
+		delete[] buffer;
+		return 0;
+	}
+
 	BOARD_FILL:
 
-		if(send(client_sockets[i], "Send the coordinates like this: x1y1x2y2\n", 40, 0) < 0) {
-			pthread_mutex_lock(&mute);
-    		std:: cout << "Can't reach user :(";
-			pthread_mutex_unlock(&mute);
-			close(server_socket);
-			exit(errno);
-    	}
+	ships = save_ships;
 
-		std::cout << "problem here1";
- 
-    	bytes_recieved = recv(client_sockets[i], buffer, 1000, 0);
-    	if(bytes_recieved <= 0) {
-			pthread_mutex_lock(&mute);
-	    	std::cout <<  "Failed to hear from client :(";
-			pthread_mutex_unlock(&mute);
-			close(server_socket);
-	    	exit(errno);
-    	}
+	int ships_filled = 0;
 
-		if(bytes_recieved != ship_count * 4) {
+	NEW_SHIP:
 
-			if(send(client_sockets[i], "Incorrect number of coordinates. Try again!\n", 44, 0) < 0) {
-				pthread_mutex_lock(&mute);
-    			std:: cout << "Can't reach user :(";
-				pthread_mutex_unlock(&mute);
-				close(server_socket);
-				exit(errno);
-    		}
+	coords = {};
 
-			goto BOARD_FILL;
+	msg = "Remaining ships: ";
+	for(int i = 0; i < ships.size(); ++i) {
+		msg += std::to_string(ships[i]);
+		msg += " ";
+	}
+	msg += "\n";
 
-		}
+	if(!send_msg(client_sockets, client_sockets[i], msg)) {
+		delete[] buffer;
+		return 0;
+	}
 
-		std::cout << "problem here2";
+	msg = "Send the coordinates of the ";
+	msg += std::to_string(ships_filled + 1);
+	msg += " ship like this: x1 y1 x2 y2\n";
 
-		for(int j = 0; j < ship_count; ++j) {
+	if(!send_msg(client_sockets, client_sockets[i], msg)) {
+		delete[] buffer;
+		return 0;
+	}	
 
-			x1 = (buffer[j * 4] - '0');
-			y1 = (buffer[j * 4 + 1] - '0');
-			x2 = (buffer[j * 4 + 2] - '0');
-			y2 = (buffer[j * 4 + 3] - '0');
+	buffer[0] = {0};
+	if(!recv_msg(client_sockets, client_sockets[i], buffer, bytes_recieved)) {
+		delete[] buffer;
+		return 0;
+	}
 
-		if(x1 == x2) {
-			begin = std::min(y1, y2);
-			end = std::max(y1, y2);
+	std::istringstream iss(buffer);
+	//count = 0;
+	while(iss >> value) {
+		coords.push_back(value);
+	}
 
-			for(int l = begin; l <= end; ++l) {
-				if(real_board[i][l][x1] == 1)  {
-					if(send(client_sockets[i], "Incorrect coordinates. Try again!\n", 35, 0) < 0) {
-						pthread_mutex_lock(&mute);
-    					std:: cout << "Can't reach user :(";
-						pthread_mutex_unlock(&mute);
-						close(server_socket);
-						exit(errno);
-    				}
-
-					goto BOARD_FILL;
+	if(coords.size() != 4) {
+		if(!send_msg(client_sockets, client_sockets[i], "Incorrect number of coordinates. Try again!\n")) {
+					delete[] buffer;
+					return 0;
 				}
-				real_board[i][l][x1] = 1;
-			}
+		goto NEW_SHIP;
+	}
+
+	if(!iss.eof()) {
+		if(!send_msg(client_sockets, client_sockets[i], "Incorrect coordinates. Try again!\n")) {
+			delete[] buffer;
+			return 0;
 		}
-		else if(y1 == y2) {
-			begin = std::min(x1, x2);
-			end = std::max(x1, x2);
+		goto NEW_SHIP;	
+	}
 
-			for(int l = begin; l <= end; ++l) {
-				if(real_board[i][y1][l] == 1)  {
-					if(send(client_sockets[i], "Incorrect coordinates. Try again!\n", 35, 0) < 0) {
-						pthread_mutex_lock(&mute);
-    					std:: cout << "Can't reach user :(";
-						pthread_mutex_unlock(&mute);
-						close(server_socket);
-						exit(errno);
-    				}
-
-					goto BOARD_FILL;
+	for(int i = 0; i < 4; ++i) {
+			-- coords[i]; 
+			if(coords[i] < 0 || coords[i] >= board_size) {
+				if(!send_msg(client_sockets, client_sockets[i], "Coordinates out of border. Try again!\n")) {
+					delete[] buffer;
+					return 0;
 				}
-				real_board[i][y1][l] = 1;
+				goto NEW_SHIP;
 			}
+	}
+
+	if(coords[0] == coords[2]) {
+		begin = std::min(coords[1], coords[3]);
+		end = std::max(coords[1], coords[3]);
+
+		if (end - begin >= ships.size()) {
+			if(!send_msg(client_sockets, client_sockets[i], "There's no ship with such value! Try again!\n")) {
+				delete[] buffer;
+				return 0;
+			}
+			goto NEW_SHIP;
+		}
+			
+			
+		if(ships[end - begin] > 0) {
 		}
 		else {
-			if(send(client_sockets[i], "Incorrect coordinates. Try again!\n", 35, 0) < 0) {
-				pthread_mutex_lock(&mute);
-    			std:: cout << "Can't reach user :(";
-				pthread_mutex_unlock(&mute);
-				close(server_socket);
-				exit(errno);
-    		}
-
-			goto BOARD_FILL;
+			if(!send_msg(client_sockets, client_sockets[i], "Incorrect ship value! Try again!\n")) {
+				delete[] buffer;
+				return 0;
+			}
+			goto NEW_SHIP;
 		}
 
-		std::cout << "problem here3";
 
-		
+		for(int l = begin; l <= end; ++l) {
+			if(real_board[i][l][coords[0]] == 1)  {
+				if(!send_msg(client_sockets, client_sockets[i], "New ship overrides old one! Try again!\n")) {
+					delete[] buffer;
+					return 0;
+				}
+				goto NEW_SHIP;
+			}
+			real_board[i][l][coords[0]] = 1;
+		}
 	}
+	else if(coords[1] == coords[3]) {
+		begin = std::min(coords[0], coords[2]);
+		end = std::max(coords[0], coords[2]);
+
+		if (end - begin >= ships.size()) {
+			if(!send_msg(client_sockets, client_sockets[i], "There's no ship with such value! Try again!\n")) {
+				delete[] buffer;
+				return 0;
+			}
+			goto NEW_SHIP;
+		}
+
+		if(ships[end - begin] > 0) {
+		}
+		else {
+			if(!send_msg(client_sockets, client_sockets[i], "Incorrect ship value! Try again!\n")) {
+				delete[] buffer;
+				return 0;
+			}
+			goto NEW_SHIP;
+		}
+
+		for(int l = begin; l <= end; ++l) {
+			if(real_board[i][l][coords[1]] == 1)  {
+				if(!send_msg(client_sockets, client_sockets[i], "New ship overrides old one! Try again!\n")) {
+					delete[] buffer;
+					return 0;
+				}
+				goto NEW_SHIP;
+			}
+			real_board[i][l][coords[1]] = 1;
+		}
+	}
+	else {
+
+			if(!send_msg(client_sockets, client_sockets[i], "Incorrect coordinates. Try again!\n")) {
+						delete[] buffer;
+						return 0;
+			}
+			goto NEW_SHIP;
+		}	
+
+		--ships[end - begin];
+
+		if(ships_filled < ship_count - 1) {
+			++ships_filled;
+			goto NEW_SHIP;
+		}
 
 	}
 
@@ -242,106 +402,118 @@ void* sea_fight (void* arg) {
 
 	//try
 	for(int i = 0; i < players_count - 1; ++i) {
-		draw_boards(client_sockets[i], real_board[i], real_board[i + 1]);
+		draw_boards(client_sockets[i], real_board[i], real_board[i + 1], board_size);
 	}
-	draw_boards(client_sockets[players_count - 1], real_board[players_count - 1], real_board[0]);
+	draw_boards(client_sockets[players_count - 1], real_board[players_count - 1], real_board[0], board_size);
 	//try
 
 	std::vector<int> scores(players_count, 0);
 
-	std::srand(std::time({}));
-	int cur_player = std::rand() % players_count;
+	
 
 	bool r_break = false;
 
-	while(true) {
-		if(send(client_sockets[cur_player], "Send the coordinates like this: xy\n", 39, 0) < 0) {
-		pthread_mutex_lock(&mute);
-    	std:: cout << "Can't reach user :(";
-		pthread_mutex_unlock(&mute);
-		exit(errno);
-   	}
-	
-    bytes_recieved = recv(client_sockets[cur_player], buffer, 1000, 0);
-    if(bytes_recieved <= 0) {
-		pthread_mutex_lock(&mute);
-	    std::cout <<  "Failed to hear from client :(";
-		pthread_mutex_unlock(&mute);
-	    exit(errno);
-    }
-
-	int x;
-	int y;
-
-	x = (buffer[1] - '0');
-	y = (buffer[0] - '0');
+	std::vector<int> xy(2, 0);
 
 	int opponent;
 	int o_opponent;
 
-	if(cur_player < players_count - 1) {
-		opponent = cur_player + 1;
-	}
-	else {
-		opponent = 0;
-	}
-	if(opponent < players_count - 1) {
-		o_opponent = opponent + 1;
-	}
-	else {
-		o_opponent = 0;
-	}
+	SEND_COORDINATES:
 
-	if(real_board[opponent][x][y] == 1) {
+	while(true) {
+		if(!send_msg(client_sockets, client_sockets[cur_player], "Send the coordinates like this: x y\n")) {
+			delete[] buffer;
+			return 0;
+		}
+
+		if(!recv_msg(client_sockets, client_sockets[cur_player], buffer, bytes_recieved)) {
+			delete[] buffer;
+			return 0;
+		}
+
+		std::istringstream iss(buffer);
+		count = 1;
+		while(iss >> xy[count]) {
+			--count;
+			if(count < 0) {
+				break;
+			}
+		}
+
+		if(!iss.eof()) {
+			if(!send_msg(client_sockets, client_sockets[cur_player], "Incorrect coordinates. Try again!\n")) {
+				delete[] buffer;
+				return 0;
+			}
+			goto SEND_COORDINATES;	
+		}	
+
+		for(int i = 0; i < 2; ++i) {
+			-- xy[i]; 
+			if(xy[i] < 0 || xy[i] >= board_size) {
+				if(!send_msg(client_sockets, client_sockets[cur_player], "Coordinates out of border. Try again!\n")) {
+					delete[] buffer;
+					return 0;
+				}
+				goto SEND_COORDINATES;
+			}
+		}
+
+		opponent = (cur_player + 1) % players_count;
+		o_opponent = (cur_player + 2) % players_count;
+		
+		if(real_board[opponent][xy[0]][xy[1]] == 1) {
 
 				++ scores[cur_player];
-				real_board[opponent][x][y] = 2;
+				real_board[opponent][xy[0]][xy[1]] = 2;
 
-				if(send(client_sockets[opponent], "Your ship has been damaged!\n", 28, 0) < 0) {
-					pthread_mutex_lock(&mute);
-    				std:: cout << "Can't reach user :(";
-					pthread_mutex_unlock(&mute);
-					exit(errno);
-    			}
-				draw_boards(client_sockets[opponent], real_board[opponent], real_board[o_opponent]);
+				if(!send_msg(client_sockets, client_sockets[opponent], "Your ship has been damaged!\n")) {
+					delete[] buffer;
+					return 0;
+				}
 
-				if(send(client_sockets[cur_player], "Bullseye!\n", 10, 0) < 0) {
-					pthread_mutex_lock(&mute);
-    				std:: cout << "Can't reach user :(";
-					pthread_mutex_unlock(&mute);
-					exit(errno);
-    			}
-				draw_boards(client_sockets[cur_player], real_board[cur_player], real_board[opponent]);
+				draw_boards(client_sockets[opponent], real_board[opponent], real_board[o_opponent], board_size);
+
+				if(!send_msg(client_sockets, client_sockets[cur_player], "Bullseye!\n")) {
+					delete[] buffer;
+					return 0;
+				}
+
+				draw_boards(client_sockets[cur_player], real_board[cur_player], real_board[opponent], board_size);
 				
 
 			}
-			else {
+		else if(real_board[opponent][xy[0]][xy[1]] == 0)  {
 
-				real_board[opponent][x][y] = 3;
+				real_board[opponent][xy[0]][xy[1]] = 3;		
 				
+				if(!send_msg(client_sockets, client_sockets[opponent], "Phew, nothing!\n")) {
+					delete[] buffer;
+					return 0;
+				}
 
-				if(send(client_sockets[opponent], "Phew, nothing!\n", 15, 0) < 0) {
-					pthread_mutex_lock(&mute);
-    				std:: cout << "Can't reach user :(";
-					pthread_mutex_unlock(&mute);
-					exit(errno);
-    			}
-				draw_boards(client_sockets[opponent], real_board[opponent], real_board[o_opponent]);
+				draw_boards(client_sockets[opponent], real_board[opponent], real_board[o_opponent], board_size);
 
-				if(send(client_sockets[cur_player], "Meh, nothing!\n", 14, 0) < 0) {
-					pthread_mutex_lock(&mute);
-    				std:: cout << "Can't reach user :(";
-					pthread_mutex_unlock(&mute);
-					exit(errno);
-    			}
-				draw_boards(client_sockets[cur_player], real_board[cur_player], real_board[opponent]);
+				if(!send_msg(client_sockets, client_sockets[cur_player], "Meh, nothing!\n")) {
+					delete[] buffer;
+					return 0;
+				}
+
+				draw_boards(client_sockets[cur_player], real_board[cur_player], real_board[opponent], board_size);
 
 				cur_player = opponent;
 				
+		}
+		else if(real_board[opponent][xy[0]][xy[1]] == 2 || real_board[opponent][xy[0]][xy[1]] == 3) {
+			if(!send_msg(client_sockets, client_sockets[cur_player], "Already shoot there! Try again!\n")) {
+					delete[] buffer;
+					return 0;
 			}
+			goto SEND_COORDINATES;
+		}
+
 
 	for(int i = 0; i < players_count; ++i) {
-		std::cout << i << " " << scores[i] << "\n";
 		if(scores[i] == max_score) {
 			r_break = true;
 			break;
@@ -356,208 +528,26 @@ void* sea_fight (void* arg) {
 
 	for(int i = 0; i < players_count; ++i) {
 		if(scores[i] == max_score) {
-			if(send(client_sockets[i], "You win :)\n", 11, 0) < 0) {
-				pthread_mutex_lock(&mute);
-    			std:: cout << "Can't reach user :(";
-				pthread_mutex_unlock(&mute);
-				exit(errno);
-    		}
+			if(!send_msg(client_sockets, client_sockets[i], "You win :)\n")) {
+					delete[] buffer;
+					return 0;
+			}
 		}
 		else {
-			if(send(client_sockets[i], "You lose :(\n", 12, 0) < 0) {
-				pthread_mutex_lock(&mute);
-    			std:: cout << "Can't reach user :(";
-				pthread_mutex_unlock(&mute);
-				exit(errno);
-    		}
+			if(!send_msg(client_sockets, client_sockets[i], "You lose :(\n")) {
+					delete[] buffer;
+					return 0;
+			}
 		}
 		close(client_sockets[i]);
 	}
 
+	delete[] buffer;
+	delete[] client_sockets;
+
 	return 0;
 
 }
- 
-/* void* handle_client(void* arg) {
-
-    User cur_user;
- 
-    int client_socket = *(static_cast<int*>(arg));
-
-	
-
-    //register/sign up
- 
-    if(send(client_socket, "Sign up or register (press r/s)\n", 32, 0) < 0) {
-    	std:: cout << "Can't reach user :(";
-	exit(errno);
-    }
- 
-    char buffer[1001];
-    int bytes_recieved;
- 
-    if(bytes_recieved = recv(client_socket, buffer, 1000, 0) <= 0) {
-	    std::cout <<  "Failed to hear from client :(";
-	    close(client_socket);
-	    exit(errno);
-    }
-    else if(buffer[0] == 'r') {
-	    while(true) {
-	    	if(send(client_socket, "Enter your desired nickname: \n", 30, 0) <= 0) {
-                	std::cout << "Failed to reach user :(";
-                	continue;
-            	}
-		if((bytes_recieved = recv(client_socket, buffer, 1000, 0)) <= 0) {
-            		std::cout <<  "Failed to hear from client :(";
-            		continue;
-		}
-		buffer[bytes_recieved] = '\0';
-		std::string name = buffer;
- 
-		pthread_mutex_lock(&mute);
-		if(users.contains(name)) {
-			if(send(client_socket, "Nickname is already in use :( \n", 31, 0) != 0) {
-        	                std::cout << "Failed to reach user :(";
-                	       		continue;
-			}
-
-		}
-		pthread_mutex_unlock(&mute);
- 
-		if(send(client_socket, "Great! Now, create a password: \n", 32, 0) <= 0) {
-			std::cout << "Failed to reach user :(";
-                        continue;
-                }
- 
-		if(bytes_recieved = recv(client_socket, buffer, 1000, 0) <= 0) {
-                        std::cout <<  "Failed to hear from client :(";
-                        continue;
-                }
- 
-		buffer[bytes_recieved] = '\0';
- 
-		std::string password = buffer;
- 
-		cur_user.login = name;
-		cur_user.password = password;
- 
-		pthread_mutex_lock(&mute);
-		users.insert(cur_user.login, cur_user);
-		pthread_mutex_unlock(&mute);
- 
-		if(send(client_socket, "Yay! Congratulations, your account has been created succesfully! Have fun playing :) \n", 86, 0) <= 0) {
-                        std::cout << "Failed to reach user :(";
-                        continue;
-                }
-
-		for(auto user : users_online) {
-			std::cout << user.login << '\n';
-		}
-
-		break;
- 
- 
- 
-	    }
- 
-    }
-    else if(buffer[0] == 's') {
-	    while(true) {
-	    	if(send(client_socket, "Enter your login: \n", 20, 0) <= 0) {
-	    		std::cout << "Failed to reach user :(";
-			close(client_socket);
-			break;
-		    }
-		int br;
-		char buffer[4096];
-		if((br = recv(client_socket, buffer, sizeof(buffer) - 1, 0)) <= 0) {
-			std::cout << "Failed to reach user\n";
-			close(client_socket);
-			break;
-
-		}
-		buffer[br] = '\0';
-		std::string s;
-		s = buffer;
-		bool exist = false;
-		for(auto user : users) {
-			if(user.login == s) {
-				exist = true;
-					
-			} 
-		}
-		if()
-	    }
-    } */
-    /*
-    else {
-	    if(send() != 0) {
-		    std::cout << "Failed to reach user :(";
-		    exit(errno);
-	    }
-    } 
- 
- 
-    while (true) {
-		}
-		if()
-	    }
-    }
-    
-    else {
-	    if(send() != 0) {
-		    std::cout << "Failed to reach user :(";
-		    exit(errno);
-	    }
-    } */
- 
-
-//playing
-/*
-    while (true) {
-
-	    User user2;
-
-	    if(users_online.size() > 1) {
-		    for(auto user : users_online) {
-		    	if(user.login != cur_user.login) {
-			
-				Seafight game;
-
-				send(client_socket, "new game opened\n", 17, 0);
-
-				user2 = user;
-
-				send(user2.c_socket, "new game opened"\n, 17, 0);
-
-				
-			
-			}
-		    }
-	    }
-    } 
- 
- 
-    while (true) {
-        int rs = recv(client_socket, buffer, 1000, 0);
-        if (rs <= 0) break;
-        buffer[rs] = '\0';
- 
-	pthread_mutex_lock(&mute);
- 
-	std::cout << buffer << "\n";
- 
-        pthread_mutex_unlock(&mute);
-    }
- 
-    close(client_socket);
- 
-    pthread_mutex_lock(&mute);
-    std::cout << "Client disconnected: ";
-    pthread_mutex_unlock(&mute);
- 
-    return 0;
-} */
 
 //main
  
@@ -565,13 +555,6 @@ int main() {
 
 
   int bd_fd;
-
-  /*
-  if(bd_fd = open("bd.txt", O_RDWR | O_CREAT, 0664) == -1) {
-
-  	
-  }
-  */ 
 
   // create a socket
   server_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -611,29 +594,23 @@ int main() {
 
       // Accept incoming connection
 
-	  int sockets[players_count];
+	  int* sockets = new int[players_count];
 
 	  for(int i = 0; i < players_count; ++i) {
       	if ((sockets[i] = accept(server_socket, (struct sockaddr*) &client_address, &client_addr_len)) < 0) {
           	perror("accept failed");
-          	exit(errno);
+          	-- i;
+			continue;
       	}
 		std::cout << i + 1 << " player connected.\n";
 		if(send(sockets[i], "You're connected! Wait a little... \n", 36, 0) <= 0) {
 	    	std::cout << "Failed to reach user :(";
 			close(sockets[i]);
 			break;
-
 	    }
-		}
-
-		
-	  
-        pthread_t thread;
-
-         
+		}  
+        pthread_t thread;     
       if (pthread_create(&thread, nullptr, sea_fight, sockets) == 0) {
-
 		pthread_detach(thread);
       }
       else {
@@ -641,10 +618,8 @@ int main() {
 		for(int i = 0; i < players_count; ++i) {
 			close(sockets[i]);
 		}
-      }
-	
+      }	
     }
-
     close(server_socket);
     pthread_mutex_destroy(&mute);
     return 0;
