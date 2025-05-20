@@ -61,10 +61,10 @@ void draw_boards(int client_socket, std::vector<std::vector<int>>& r_board, std:
 
 	std::string r_message;
 
-	for (int i = 0; i < board_size; ++i) {
-		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
+	for (int i = 0; i < board_size + 1; ++i) {
+		r_message += std::string("\033[1;30;47m ") + (i < 10 ? " " : "") + std::to_string(i) + "\033[0m";
 	}
-	r_message += "\n";
+	r_message += "\033[1;30;47m \033[0m\n";
 
 	for (int i = 0; i < board_size; ++i) {
 		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
@@ -82,10 +82,10 @@ void draw_boards(int client_socket, std::vector<std::vector<int>>& r_board, std:
 	}
 	r_message += "\n";
 
-	for (int i = 0; i < board_size; ++i) {
-		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
+	for (int i = 0; i < board_size + 1; ++i) {
+		r_message += std::string("\033[1;30;47m ") + (i < 10 ? " " : "") + std::to_string(i) + "\033[0m";
 	}
-	r_message += "\n";
+	r_message += "\033[1;30;47m \033[0m\n";
 
 	for (int i = 0; i < board_size; ++i) {
 		r_message += std::string("\033[1;30;47m ") + (i < 9 ? " " : "") + std::to_string(i + 1) + " \033[0m";
